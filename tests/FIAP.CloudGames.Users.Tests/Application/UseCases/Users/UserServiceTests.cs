@@ -75,24 +75,66 @@ namespace FIAP.CloudGames.Users.Tests.Application.UseCases.Users
         public async Task UpdateAsync_ShouldReturnUpdatedUser()
         {
             var id = Guid.NewGuid();
-            var existingUser = new User("Old", Email.Create("old@test.com"), Password.FromPlainText("Password!123"), UserRolesEnum.User);
+            var existingUser = new User(
+                "Old",
+                Email.Create("old@test.com"),
+                Password.FromPlainText("Password!123"),
+                UserRolesEnum.User
+            );
+
             var dto = new UpdateUserDto
             {
                 Id = id,
                 Name = "New",
                 Email = "new@test.com",
-                Password = "Password!123",
                 Role = UserRolesEnum.Admin
             };
 
             _userRepositoryMock.Setup(r => r.GetByIdAsync(id)).ReturnsAsync(existingUser);
-            _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).ReturnsAsync(existingUser);
+            _userRepositoryMock.Setup(r => r.UpdateAsync(It.IsAny<User>())).ReturnsAsync((User u) => u);
 
             var result = await _userService.UpdateAsync(dto);
 
             Assert.NotNull(result);
             Assert.Equal("New", result!.Name);
+            Assert.Equal("new@test.com", result.Email.Address);
             Assert.Equal(UserRolesEnum.Admin, result.Role);
+
+            _userRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<User>()), Times.Once);
+        }
+
+        [Fact]
+        public async Task UpdatePasswordAsync_ShouldUpdatePasswordAndReturnUser()
+        {
+            var id = Guid.NewGuid();
+            var oldPassword = Password.FromPlainText("OldPassword!123");
+            var existingUser = new User(
+                "User",
+                Email.Create("user@test.com"),
+                oldPassword,
+                UserRolesEnum.User
+            );
+
+            var dto = new UpdateUserPasswordDto
+            {
+                Id = id,
+                Password = "NewPassword!456"
+            };
+
+            _userRepositoryMock
+                .Setup(r => r.GetByIdAsync(id))
+                .ReturnsAsync(existingUser);
+
+            _userRepositoryMock
+                .Setup(r => r.UpdateAsync(It.IsAny<User>()))
+                .ReturnsAsync((User u) => u);
+
+            var result = await _userService.UpdatePasswordAsync(dto);
+
+            Assert.NotNull(result);
+            Assert.NotEqual(oldPassword.Hash, result!.Password.Hash);
+            Assert.True(result.Password.Verify(dto.Password));
+
             _userRepositoryMock.Verify(r => r.UpdateAsync(It.IsAny<User>()), Times.Once);
         }
 

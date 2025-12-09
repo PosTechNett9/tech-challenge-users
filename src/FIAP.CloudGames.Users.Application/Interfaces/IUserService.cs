@@ -9,6 +9,7 @@ namespace FIAP.CloudGames.Users.Application.Interfaces
         Task<User?> GetByIdAsync(Guid id);
         Task<User> CreateAsync(CreateUserDto dto);
         Task<User?> UpdateAsync(UpdateUserDto dto);
+        Task<User?> UpdatePasswordAsync(UpdateUserPasswordDto dto);
         Task<bool> DeleteAsync(Guid id);
     }
 }

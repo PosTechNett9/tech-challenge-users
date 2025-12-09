@@ -20,7 +20,7 @@ public class User
     public User(string name, Email email, Password password, UserRolesEnum role)
     {
         Id = Guid.NewGuid();
-        CreatedAt = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, TimeZoneInfo.FindSystemTimeZoneById("E. South America Standard Time"));
+        CreatedAt = DateTime.UtcNow;
         Name = name;
         Email = email;
         Password = password;

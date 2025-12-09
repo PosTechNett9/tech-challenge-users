@@ -66,6 +66,22 @@ namespace FIAP.CloudGames.Users.API.Controllers
             return Ok(updatedUser);
         }
 
+        [HttpPut("update-password")]
+        [Authorize(Roles = "Admin,User")]
+        public async Task<IActionResult> UpdatePassword([FromBody] UpdateUserPasswordDto dto)
+        {
+            _logger.LogInformation("Update user solicitado {UserId}", dto.Id);
+
+            var updatedUser = await _userService.UpdatePasswordAsync(dto);
+            if (updatedUser is null)
+            {
+                _logger.LogWarning("Update falhou, user não encontrado {UserId}", dto.Id);
+                return NotFound();
+            }
+
+            return Ok(updatedUser);
+        }
+
         [HttpDelete("{id}")]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)

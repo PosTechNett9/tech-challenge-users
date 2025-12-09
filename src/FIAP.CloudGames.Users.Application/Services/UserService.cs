@@ -36,19 +36,34 @@ namespace FIAP.CloudGames.Users.Application.Services
             return await _userRepository.GetByIdAsync(id);
         }
 
-
         public async Task<User?> UpdateAsync(UpdateUserDto dto)
         {
             var user = await _userRepository.GetByIdAsync(dto.Id);
             if (user == null) return null;
 
-            var password = Password.FromPlainText(dto.Password);
-            var email = Email.Create(dto.Email);
+            if (dto.Email != null)
+            {
+                var email = Email.Create(dto.Email);
+                user.Email = email;
+            }
 
-            user.Name = dto.Name;
-            user.Email = email;
+            if (dto.Name != null)
+                user.Name = dto.Name;
+
+            if (dto.Role != null)
+                user.Role = dto.Role.Value;
+
+            return await _userRepository.UpdateAsync(user);
+        }
+
+        public async Task<User?> UpdatePasswordAsync(UpdateUserPasswordDto dto)
+        {
+            var user = await _userRepository.GetByIdAsync(dto.Id);
+            if (user == null) return null;
+
+            var password = Password.FromPlainText(dto.Password);
+
             user.Password = password;
-            user.Role = dto.Role;
 
             return await _userRepository.UpdateAsync(user);
         }
