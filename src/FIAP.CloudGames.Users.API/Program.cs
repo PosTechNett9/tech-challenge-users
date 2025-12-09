@@ -24,7 +24,7 @@ builder.Services.AddCustomSwagger();
 
 // DbContext
 builder.Services.AddDbContext<UsersDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Logging
 builder.Host.UseSerilog((context, services, configuration) =>
