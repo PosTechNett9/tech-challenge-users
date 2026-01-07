@@ -9,7 +9,6 @@ using FIAP.CloudGames.Users.Infrastructure.Context;
 using FIAP.CloudGames.Users.Infrastructure.Logging;
 using FIAP.CloudGames.Users.Infrastructure.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Seeders;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Prometheus;
@@ -74,15 +73,12 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-builder.Services.AddAuthorizationBuilder()
-    .SetFallbackPolicy(new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build())
-    .AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-
 #endregion
 
 var app = builder.Build();
+
+app.UsePathBase("/users");
+app.UseRouting();
 
 // Middlewares
 app.UseMiddleware<ErrorHandlingMiddleware>();
@@ -96,10 +92,15 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 //    await UserSeeder.SeedAdminAsync(db);
 //}
 
+app.MapGet("/health", () => Results.Ok("OK")).AllowAnonymous();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(c =>
+    {
+        c.SwaggerEndpoint("v1/swagger.json", "Users API v1");
+    });
 }
 
 app.UseHttpsRedirection();
