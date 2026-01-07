@@ -12,6 +12,7 @@ using FIAP.CloudGames.Users.Infrastructure.Seeders;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Prometheus;
 using Serilog;
 using System.Security.Claims;
 using System.Text;
@@ -87,13 +88,13 @@ var app = builder.Build();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
 
-// Seed inicial
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
-    db.Database.Migrate();
-    await UserSeeder.SeedAdminAsync(db);
-}
+//// Seed inicial
+//using (var scope = app.Services.CreateScope())
+//{
+//    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+//    db.Database.Migrate();
+//    await UserSeeder.SeedAdminAsync(db);
+//}
 
 if (app.Environment.IsDevelopment())
 {
@@ -102,6 +103,18 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+
+app.UseHttpMetrics();
+app.MapMetrics("/metrics").AllowAnonymous();
+
+app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/metrics"),
+    b =>
+    {
+        b.UseHttpsRedirection();
+        b.UseAuthentication();
+        b.UseAuthorization();
+    });
+
 app.UseSerilogRequestLogging();
 app.UseAuthentication();
 app.UseAuthorization();
