@@ -1,4 +1,4 @@
-using FIAP.CloudGames.Users.API.Extensions;
+﻿using FIAP.CloudGames.Users.API.Extensions;
 using FIAP.CloudGames.Users.API.Middlewares;
 using FIAP.CloudGames.Users.Application.Interfaces;
 using FIAP.CloudGames.Users.Application.Services;
@@ -11,29 +11,58 @@ using FIAP.CloudGames.Users.Infrastructure.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Seeders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using Prometheus;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
 using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Swagger
+
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCustomSwagger();
 
-// DbContext
 builder.Services.AddDbContext<UsersDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Logging
+#region Telemetria
+var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "users-api";
+var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4317";
+
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(serviceName))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation(options =>
+        {
+            options.RecordException = true;
+        })
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(otlpEndpoint);
+        }))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri(otlpEndpoint);
+        }));
+
+#endregion
+
 builder.Host.UseSerilog((context, services, configuration) =>
 {
     configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
-        .WriteTo.Console();
+        .Enrich.WithProperty("service.name", "users-api");
 });
 
 #region Application Services Configuration
@@ -41,9 +70,7 @@ builder.Host.UseSerilog((context, services, configuration) =>
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
-
 builder.Services.AddControllers();
-
 #endregion
 
 #region JWT Authentication Configuration
@@ -77,14 +104,14 @@ builder.Services.AddAuthentication("Bearer")
 
 var app = builder.Build();
 
+
 app.UsePathBase("/users");
 app.UseRouting();
 
-// Middlewares
-app.UseMiddleware<ErrorHandlingMiddleware>();
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ErrorHandlingMiddleware>();
 
-// Seed inicial
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
@@ -92,7 +119,9 @@ using (var scope = app.Services.CreateScope())
     await UserSeeder.SeedAdminAsync(db);
 }
 
-app.MapGet("/health", () => Results.Ok("OK")).AllowAnonymous();
+
+app.MapGet("/health", () => Results.Ok("OK"))
+   .AllowAnonymous();
 
 if (app.Environment.IsDevelopment())
 {
@@ -105,19 +134,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseHttpMetrics();
-app.MapMetrics("/metrics").AllowAnonymous();
-
-app.UseWhen(ctx => !ctx.Request.Path.StartsWithSegments("/metrics"),
-    b =>
-    {
-        b.UseHttpsRedirection();
-        b.UseAuthentication();
-        b.UseAuthorization();
-    });
-
 app.UseSerilogRequestLogging();
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 app.Run();

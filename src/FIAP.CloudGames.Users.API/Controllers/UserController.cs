@@ -2,12 +2,16 @@
 using FIAP.CloudGames.Users.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Diagnostics;
 
 namespace FIAP.CloudGames.Users.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserController(IUserService userService, ILogger<UserController> logger) : ControllerBase
+    public class UserController(
+        IUserService userService,
+        ILogger<UserController> logger
+    ) : ControllerBase
     {
         private readonly IUserService _userService = userService;
         private readonly ILogger<UserController> _logger = logger;
@@ -16,6 +20,13 @@ namespace FIAP.CloudGames.Users.API.Controllers
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> GetAll()
         {
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "GetAll users solicitado | TraceId: {TraceId}",
+                traceId
+            );
+
             var users = await _userService.GetAllAsync();
             return Ok(users);
         }
@@ -24,42 +35,73 @@ namespace FIAP.CloudGames.Users.API.Controllers
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            _logger.LogInformation("GetById solicitado {UserId}", id);
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "GetById solicitado | UserId: {UserId} | TraceId: {TraceId}",
+                id,
+                traceId
+            );
 
             var user = await _userService.GetByIdAsync(id);
 
             if (user is null)
             {
-                _logger.LogWarning("User não encontrado {UserId}", id);
+                _logger.LogWarning(
+                    "User não encontrado | UserId: {UserId} | TraceId: {TraceId}",
+                    id,
+                    traceId
+                );
+
                 return NotFound();
             }
 
             return Ok(user);
         }
 
-
         [HttpPost]
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> Create([FromBody] CreateUserDto dto)
         {
-            _logger.LogInformation("Create user solicitado {Email}", dto.Email);
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "Create user solicitado | Email: {Email} | TraceId: {TraceId}",
+                dto.Email,
+                traceId
+            );
 
             var createdUser = await _userService.CreateAsync(dto);
 
-            return CreatedAtAction(nameof(GetById), new { id = createdUser.Id }, createdUser);
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = createdUser.Id },
+                createdUser
+            );
         }
-
 
         [HttpPut]
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update([FromBody] UpdateUserDto dto)
         {
-            _logger.LogInformation("Update user solicitado {UserId}", dto.Id);
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "Update user solicitado | UserId: {UserId} | TraceId: {TraceId}",
+                dto.Id,
+                traceId
+            );
 
             var updatedUser = await _userService.UpdateAsync(dto);
+
             if (updatedUser is null)
             {
-                _logger.LogWarning("Update falhou, user não encontrado {UserId}", dto.Id);
+                _logger.LogWarning(
+                    "Update falhou, user não encontrado | UserId: {UserId} | TraceId: {TraceId}",
+                    dto.Id,
+                    traceId
+                );
+
                 return NotFound();
             }
 
@@ -70,12 +112,24 @@ namespace FIAP.CloudGames.Users.API.Controllers
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> UpdatePassword([FromBody] UpdateUserPasswordDto dto)
         {
-            _logger.LogInformation("Update user solicitado {UserId}", dto.Id);
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "Update password solicitado | UserId: {UserId} | TraceId: {TraceId}",
+                dto.Id,
+                traceId
+            );
 
             var updatedUser = await _userService.UpdatePasswordAsync(dto);
+
             if (updatedUser is null)
             {
-                _logger.LogWarning("Update falhou, user não encontrado {UserId}", dto.Id);
+                _logger.LogWarning(
+                    "Update password falhou, user não encontrado | UserId: {UserId} | TraceId: {TraceId}",
+                    dto.Id,
+                    traceId
+                );
+
                 return NotFound();
             }
 
@@ -86,19 +140,34 @@ namespace FIAP.CloudGames.Users.API.Controllers
         [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            _logger.LogInformation("Delete user solicitado {UserId}", id);
+            var traceId = Activity.Current?.TraceId.ToString();
+
+            _logger.LogInformation(
+                "Delete user solicitado | UserId: {UserId} | TraceId: {TraceId}",
+                id,
+                traceId
+            );
 
             var deletedUser = await _userService.DeleteAsync(id);
 
             if (!deletedUser)
             {
-                _logger.LogWarning("Delete falhou, user não encontrado {UserId}", id);
+                _logger.LogWarning(
+                    "Delete falhou, user não encontrado | UserId: {UserId} | TraceId: {TraceId}",
+                    id,
+                    traceId
+                );
+
                 return NotFound();
             }
 
-            _logger.LogInformation("User deletado com sucesso {UserId}", id);
+            _logger.LogInformation(
+                "User deletado com sucesso | UserId: {UserId} | TraceId: {TraceId}",
+                id,
+                traceId
+            );
+
             return NoContent();
         }
-
     }
 }

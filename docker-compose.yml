@@ -1,36 +1,92 @@
-﻿version: '3.8'
+﻿version: "3.8"
 
 services:
+  users-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: users-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      OTEL_SERVICE_NAME: users-api
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://adot-collector:4317
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_TRACES_EXPORTER: otlp
+      OTEL_METRICS_EXPORTER: otlp
+      OTEL_LOGS_EXPORTER: none
+    depends_on:
+      - adot-collector
+      - jaeger
+    ports:
+      - "5001:8080"
+    networks:
+      - backend
+
+  adot-collector:
+    image: public.ecr.aws/aws-observability/aws-otel-collector:latest
+    container_name: adot-collector
+    command: ["--config=/config/otel-config.yaml"]
+    volumes:
+      - ./observability/otel-config.yaml:/config/otel-config.yaml
+    ports:
+      - "4317:4317"
+      - "4319:4318"
+      - "8889:8889"
+      - "8888:8888"
+    networks:
+      - backend
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    container_name: jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "14317:4317"
+      - "14318:4318"
+    networks:
+      - backend
+
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
     volumes:
       - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
     ports:
       - "9090:9090"
+    depends_on:
+      - adot-collector
     networks:
       - backend
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
   grafana:
     image: grafana/grafana:10.4.3
+    container_name: grafana
     ports:
       - "3000:3000"
     networks:
       - backend
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana-data:/var/lib/grafana
     depends_on:
       - prometheus
+      - jaeger
+
+networks:
+  backend:
+    driver: bridge
 
 volumes:
   prometheus-data:
   grafana-data:
-
-networks:
-  backend:
