@@ -14,6 +14,8 @@ using Microsoft.IdentityModel.Tokens;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Microsoft.OpenApi.Models;
+using Prometheus;
 using Serilog;
 using Serilog.Events;
 using System.Security.Claims;
@@ -142,9 +144,22 @@ app.MapGet("/health", () => Results.Ok("OK"))
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
+    var swaggerBasePath = builder.Configuration["SwaggerBasePath"] ?? "/users";
+
+    app.UseSwagger(c =>
+    {
+        c.PreSerializeFilters.Add((swagger, req) =>
+        {
+            swagger.Servers = new List<OpenApiServer>
+            {
+                new OpenApiServer { Url = swaggerBasePath }
+            };
+        });
+    });
+
     app.UseSwaggerUI(c =>
     {
+        c.RoutePrefix = "swagger";
         c.SwaggerEndpoint("v1/swagger.json", "Users API v1");
     });
 }
