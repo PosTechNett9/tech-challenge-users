@@ -8,24 +8,28 @@ namespace FIAP.CloudGames.Users.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class UserController(
-        IUserService userService,
-        ILogger<UserController> logger
-    ) : ControllerBase
+    public class UserController: ControllerBase
     {
-        private readonly IUserService _userService = userService;
-        private readonly ILogger<UserController> _logger = logger;
+        private readonly IUserService _userService;
+        private readonly ILogger<UserController> _logger;
+        private readonly ActivitySource _activitySource;
 
+        public UserController(IUserService userService,
+        ILogger<UserController> logger)
+        {
+            _userService = userService;
+            _logger = logger;
+            _activitySource = new ActivitySource("UsersService");
+        }
         [HttpGet]
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> GetAll()
         {
-            var traceId = Activity.Current?.TraceId.ToString();
+            var id = Guid.NewGuid();
+            using var activity = _activitySource.StartActivity("GetUser");
+            activity?.SetTag("user.id", id);
 
-            _logger.LogInformation(
-                "GetAll users solicitado | TraceId: {TraceId}",
-                traceId
-            );
+            _logger.LogInformation("Buscando usuários {id}", id);
 
             var users = await _userService.GetAllAsync();
             return Ok(users);
@@ -35,12 +39,13 @@ namespace FIAP.CloudGames.Users.API.Controllers
         [Authorize(Roles = "Admin,User")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            var traceId = Activity.Current?.TraceId.ToString();
+            using var activity = _activitySource.StartActivity("GetUser");
+            activity?.SetTag("user.id", id);
 
             _logger.LogInformation(
                 "GetById solicitado | UserId: {UserId} | TraceId: {TraceId}",
                 id,
-                traceId
+                activity.TraceId
             );
 
             var user = await _userService.GetByIdAsync(id);
@@ -50,7 +55,7 @@ namespace FIAP.CloudGames.Users.API.Controllers
                 _logger.LogWarning(
                     "User não encontrado | UserId: {UserId} | TraceId: {TraceId}",
                     id,
-                    traceId
+                    activity.TraceId
                 );
 
                 return NotFound();

@@ -15,6 +15,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Serilog;
+using Serilog.Events;
 using System.Security.Claims;
 using System.Text;
 
@@ -27,43 +28,42 @@ builder.Services.AddCustomSwagger();
 builder.Services.AddDbContext<UsersDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .Enrich.WithProperty("ServiceName", "UsersService")
+    .Enrich.WithMachineName()
+    .Enrich.WithThreadId()
+    .WriteTo.Console()
+    .WriteTo.Seq("http://localhost:5341")
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
 #region Telemetria
-var serviceName = Environment.GetEnvironmentVariable("OTEL_SERVICE_NAME") ?? "users-api";
-var otlpEndpoint = Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT") ?? "http://localhost:4317";
-
-
 builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService(serviceName))
-    .WithTracing(tracing => tracing
-        .AddAspNetCoreInstrumentation(options =>
-        {
-            options.RecordException = true;
-        })
-        .AddHttpClientInstrumentation()
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(otlpEndpoint);
-        }))
-    .WithMetrics(metrics => metrics
-        .AddAspNetCoreInstrumentation()
-        .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddOtlpExporter(options =>
-        {
-            options.Endpoint = new Uri(otlpEndpoint);
-        }));
-
+    .WithTracing(tracerProviderBuilder =>
+    {
+        tracerProviderBuilder
+            .AddAspNetCoreInstrumentation(options =>
+            {
+                options.RecordException = true;
+            })
+            .AddHttpClientInstrumentation()
+            .SetResourceBuilder(
+                ResourceBuilder.CreateDefault()
+                    .AddService(
+                        serviceName: "users-service",
+                        serviceVersion: "1.0.0"))
+                    .AddOtlpExporter(options =>
+                    {
+                        options.Endpoint = new Uri("http://localhost:4317");
+                        options.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.Grpc;
+                    });
+    });
 #endregion
 
-builder.Host.UseSerilog((context, services, configuration) =>
-{
-    configuration
-        .ReadFrom.Configuration(context.Configuration)
-        .ReadFrom.Services(services)
-        .Enrich.FromLogContext()
-        .Enrich.WithProperty("service.name", "users-api");
-});
 
 #region Application Services Configuration
 
@@ -104,6 +104,23 @@ builder.Services.AddAuthentication("Bearer")
 
 var app = builder.Build();
 
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} responded {StatusCode} in {Elapsed:0.0000} ms";
+    options.GetLevel = (httpContext, elapsed, ex) => ex != null
+        ? LogEventLevel.Error
+        : httpContext.Response.StatusCode > 499
+            ? LogEventLevel.Error
+            : LogEventLevel.Information;
+
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
+        diagnosticContext.Set("RequestScheme", httpContext.Request.Scheme);
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers["User-Agent"].ToString());
+    };
+});
+
 
 app.UsePathBase("/users");
 app.UseRouting();
@@ -112,12 +129,12 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
-    db.Database.Migrate();
-    await UserSeeder.SeedAdminAsync(db);
-}
+//using (var scope = app.Services.CreateScope())
+//{
+//    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+//    db.Database.Migrate();
+//    await UserSeeder.SeedAdminAsync(db);
+//}
 
 
 app.MapGet("/health", () => Results.Ok("OK"))
@@ -140,4 +157,17 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
-app.Run();
+
+try
+{
+    Log.Information("Starting UsersService application");
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}
