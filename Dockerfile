@@ -30,4 +30,3 @@ COPY --from=build --chown=app:app /app/publish/ ./
 
 USER app
 ENTRYPOINT ["dotnet", "FIAP.CloudGames.Users.API.dll"]
-o que é esse "--chown=app:app"?
