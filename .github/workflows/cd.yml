@@ -36,7 +36,7 @@ jobs:
       - name: Build and push Users API
         uses: docker/build-push-action@v6.18.0
         with:
-          tags: '${{ secrets.DOCKER_USERNAME }}/tech-challenge-users:latest'
+          tags: '${{ secrets.DOCKER_USERNAME }}/tech-challenge-users-alpine:latest'
           context: .
           push: true
 
