@@ -131,12 +131,12 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
 
 
-//using (var scope = app.Services.CreateScope())
-//{
-//    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
-//    db.Database.Migrate();
-//    await UserSeeder.SeedAdminAsync(db);
-//}
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
+    db.Database.Migrate();
+    await UserSeeder.SeedAdminAsync(db);
+}
 
 
 app.MapGet("/health", () => Results.Ok("OK"))
