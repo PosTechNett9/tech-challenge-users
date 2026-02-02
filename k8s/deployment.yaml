@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-deployment
+  namespace: users
+  labels:
+    app: users
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: users
+  template:
+    metadata:
+      labels:
+        app: users
+    spec:
+      containers:
+        - name: users
+          # Substitua pela sua imagem ECR / registry
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/tech-challenge-users:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://+:8080"
+            - name: ASPNETCORE_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: users-config
+                  key: ASPNETCORE_ENVIRONMENT
+            - name: SwaggerBasePath
+              valueFrom:
+                configMapKeyRef:
+                  name: users-config
+                  key: SwaggerBasePath
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: users-secrets
+                  key: ConnectionStrings__DefaultConnection
+            - name: JwtSettings__Secret
+              valueFrom:
+                secretKeyRef:
+                  name: users-secrets
+                  key: JwtSettings__Secret
+            - name: JwtSettings__Issuer
+              valueFrom:
+                secretKeyRef:
+                  name: users-secrets
+                  key: JwtSettings__Issuer
+            - name: JwtSettings__Audience
+              valueFrom:
+                secretKeyRef:
+                  name: users-secrets
+                  key: JwtSettings__Audience
+          readinessProbe:
+            httpGet:
+              path: /users/health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /users/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000

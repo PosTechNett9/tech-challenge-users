@@ -1,3 +1,0 @@
-FROM public.ecr.aws/aws-observability/aws-otel-collector:latest
-COPY observability/otel-config.yaml /config/otel-config.yaml
-CMD ["--config=/config/otel-config.yaml"]
