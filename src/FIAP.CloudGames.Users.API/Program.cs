@@ -1,4 +1,6 @@
-﻿using FIAP.CloudGames.Users.API.Extensions;
+﻿using Amazon.SimpleNotificationService;
+using Amazon.SQS;
+using FIAP.CloudGames.Users.API.Extensions;
 using FIAP.CloudGames.Users.API.Middlewares;
 using FIAP.CloudGames.Users.Application.Interfaces;
 using FIAP.CloudGames.Users.Application.Services;
@@ -11,11 +13,10 @@ using FIAP.CloudGames.Users.Infrastructure.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Seeders;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using Microsoft.OpenApi.Models;
-using Prometheus;
 using Serilog;
 using Serilog.Events;
 using System.Security.Claims;
@@ -23,6 +24,11 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+#region AWS SDK Configuration
+builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+builder.Services.AddAWSService<IAmazonSQS>();
+builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+#endregion
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddCustomSwagger();
@@ -66,7 +72,6 @@ builder.Services.AddOpenTelemetry()
     });
 #endregion
 
-
 #region Application Services Configuration
 
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -104,6 +109,22 @@ builder.Services.AddAuthentication("Bearer")
 
 #endregion
 
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<UsersDbContext>()
+    .AddCheck("sqs-connection", () =>
+    {
+        try
+        {
+            var sqs = builder.Services.BuildServiceProvider().GetRequiredService<IAmazonSQS>();
+            // Verificação básica de conexão
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
+        }
+        catch
+        {
+            return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Unhealthy();
+        }
+    });
+
 var app = builder.Build();
 
 app.UseSerilogRequestLogging(options =>
@@ -140,6 +161,8 @@ using (var scope = app.Services.CreateScope())
 
 
 app.MapGet("/health", () => Results.Ok("OK"))
+   .AllowAnonymous();
+app.MapGet("/health/ready", () => Results.Ok("OK"))
    .AllowAnonymous();
 
 if (app.Environment.IsDevelopment())
