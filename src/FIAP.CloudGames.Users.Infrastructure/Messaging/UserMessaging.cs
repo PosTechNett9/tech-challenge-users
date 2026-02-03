@@ -106,11 +106,11 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
                     };
 
                     var response = await _sqs.ReceiveMessageAsync(request, stoppingToken);
-
-                    foreach (var message in response.Messages)
-                    {
-                        await ProcessMessageAsync(message, stoppingToken);
-                    }
+                    if (response.Messages != null)
+                        foreach (var message in response.Messages)
+                        {
+                            await ProcessMessageAsync(message, stoppingToken);
+                        }
                 }
                 catch (OperationCanceledException)
                 {
