@@ -9,6 +9,7 @@ using FIAP.CloudGames.Users.Domain.Interfaces.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Configuration.Auth;
 using FIAP.CloudGames.Users.Infrastructure.Context;
 using FIAP.CloudGames.Users.Infrastructure.Logging;
+using FIAP.CloudGames.Users.Infrastructure.Messaging;
 using FIAP.CloudGames.Users.Infrastructure.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Seeders;
 using Microsoft.EntityFrameworkCore;
@@ -35,7 +36,6 @@ builder.Services.AddCustomSwagger();
 
 builder.Services.AddDbContext<UsersDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
-
 
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
@@ -73,15 +73,18 @@ builder.Services.AddOpenTelemetry()
 #endregion
 
 #region Application Services Configuration
-
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddControllers();
 #endregion
 
-#region JWT Authentication Configuration
+#region Messaging Services Configuration
+builder.Services.AddSingleton<IAuthenticationResponsePublisher, AuthenticationResponsePublisher>();
+builder.Services.AddHostedService<AuthenticationRequestConsumer>();
+#endregion
 
+#region JWT Authentication Configuration
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 
@@ -106,7 +109,6 @@ builder.Services.AddAuthentication("Bearer")
             RoleClaimType = ClaimTypes.Role
         };
     });
-
 #endregion
 
 builder.Services.AddHealthChecks()
@@ -116,7 +118,6 @@ builder.Services.AddHealthChecks()
         try
         {
             var sqs = builder.Services.BuildServiceProvider().GetRequiredService<IAmazonSQS>();
-            // Verificação básica de conexão
             return Microsoft.Extensions.Diagnostics.HealthChecks.HealthCheckResult.Healthy();
         }
         catch
@@ -135,7 +136,6 @@ app.UseSerilogRequestLogging(options =>
         : httpContext.Response.StatusCode > 499
             ? LogEventLevel.Error
             : LogEventLevel.Information;
-
     options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
     {
         diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value);
@@ -144,13 +144,10 @@ app.UseSerilogRequestLogging(options =>
     };
 });
 
-
 app.UsePathBase("/users");
 app.UseRouting();
-
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseMiddleware<ErrorHandlingMiddleware>();
-
 
 using (var scope = app.Services.CreateScope())
 {
@@ -158,7 +155,6 @@ using (var scope = app.Services.CreateScope())
     db.Database.Migrate();
     await UserSeeder.SeedAdminAsync(db);
 }
-
 
 app.MapGet("/health", () => Results.Ok("OK"))
    .AllowAnonymous();
@@ -168,7 +164,6 @@ app.MapGet("/health/ready", () => Results.Ok("OK"))
 if (app.Environment.IsDevelopment())
 {
     var swaggerBasePath = builder.Configuration["SwaggerBasePath"] ?? "/users";
-
     app.UseSwagger(c =>
     {
         c.PreSerializeFilters.Add((swagger, req) =>
@@ -179,7 +174,6 @@ if (app.Environment.IsDevelopment())
             };
         });
     });
-
     app.UseSwaggerUI(c =>
     {
         c.RoutePrefix = "swagger";
@@ -188,12 +182,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseSerilogRequestLogging();
-
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.MapControllers();
 
 try

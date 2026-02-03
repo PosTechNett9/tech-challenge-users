@@ -3,13 +3,12 @@ using Amazon.SimpleNotificationService.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using FIAP.CloudGames.Users.Application.Dtos;
+using FIAP.CloudGames.Users.Application.Interfaces; 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
-using Microsoft.Extensions.Hosting;
-using FIAP.CloudGames.Users.Application.Interfaces;
-
 
 namespace FIAP.CloudGames.Users.Infrastructure.Messaging
 {
@@ -26,7 +25,7 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
         private readonly IAmazonSimpleNotificationService _sns = sns;
         private readonly ILogger<AuthenticationResponsePublisher> _logger = logger;
         private readonly string _topicArn = configuration["AWS:SNS:AuthResponsesTopicArn"]
-                ?? throw new ArgumentNullException("AWS:SNS:AuthResponsesTopicArn not configured");
+            ?? throw new ArgumentNullException("AWS:SNS:AuthResponsesTopicArn not configured");
 
         public async Task PublishAuthenticationResponseAsync(AuthenticationResponseEvent response)
         {
@@ -87,7 +86,7 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
         private readonly IServiceProvider _serviceProvider = serviceProvider;
         private readonly ILogger<AuthenticationRequestConsumer> _logger = logger;
         private readonly string _queueUrl = configuration["AWS:SQS:AuthRequestsQueueUrl"]
-                ?? throw new ArgumentNullException("AWS:SQS:AuthRequestsQueueUrl not configured");
+            ?? throw new ArgumentNullException("AWS:SQS:AuthRequestsQueueUrl not configured");
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -113,6 +112,10 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
                         await ProcessMessageAsync(message, stoppingToken);
                     }
                 }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "[AUTH-CONSUMER] Error receiving messages from SQS");
@@ -133,7 +136,7 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
                 var snsWrapper = JsonSerializer.Deserialize<SnsMessageWrapper>(message.Body);
                 if (snsWrapper == null)
                 {
-                    _logger.LogWarning("[AUTH-CONSUMER] Failed to deserialize SNS wrapper");
+                    _logger.LogWarning("[AUTH-CONSUMER] Failed to deserialize SNS wrapper. MessageId={MessageId}", message.MessageId);
                     await DeleteMessageAsync(message);
                     return;
                 }
@@ -142,22 +145,23 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
                 var authRequest = JsonSerializer.Deserialize<AuthenticationRequestEvent>(snsWrapper.Message);
                 if (authRequest == null)
                 {
-                    _logger.LogWarning("[AUTH-CONSUMER] Failed to deserialize authentication request");
+                    _logger.LogWarning("[AUTH-CONSUMER] Failed to deserialize AuthenticationRequestEvent. MessageId={MessageId}", message.MessageId);
                     await DeleteMessageAsync(message);
                     return;
                 }
 
-                // Process authentication
+                // Resolve serviços dentro de um scope
                 using var scope = _serviceProvider.CreateScope();
                 var authService = scope.ServiceProvider.GetRequiredService<IAuthService>();
                 var responsePublisher = scope.ServiceProvider.GetRequiredService<IAuthenticationResponsePublisher>();
 
+                // Autentica usando o AuthService que já existe no projeto
                 var authResponse = await authService.AuthenticateAsync(authRequest, cancellationToken);
 
-                // Publish response
+                // Publica a resposta no SNS
                 await responsePublisher.PublishAuthenticationResponseAsync(authResponse);
 
-                // Delete message from queue
+                // Remove mensagem da fila após processar com sucesso
                 await DeleteMessageAsync(message);
 
                 _logger.LogInformation(
@@ -168,9 +172,8 @@ namespace FIAP.CloudGames.Users.Infrastructure.Messaging
             catch (Exception ex)
             {
                 _logger.LogError(ex,
-                    "[AUTH-CONSUMER] Error processing message: {MessageId}. Message will return to queue.",
+                    "[AUTH-CONSUMER] Error processing message: {MessageId}. Message will return to queue for retry.",
                     message.MessageId);
-                // Message stays in queue and will be retried
             }
         }
 
