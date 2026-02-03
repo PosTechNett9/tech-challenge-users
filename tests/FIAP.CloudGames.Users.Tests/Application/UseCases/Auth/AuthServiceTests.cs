@@ -21,6 +21,7 @@ namespace FIAP.CloudGames.Users.Tests.Application.UseCases.Auth
         {
             _userRepositoryMock = new Mock<IUserRepository>();
             _jwtTokenGeneratorMock = new Mock<IJwtTokenGenerator>();
+            _loggerMock = new Mock<ILogger<AuthService>>();
             _authService = new AuthService(_userRepositoryMock.Object, _jwtTokenGeneratorMock.Object, _loggerMock.Object);
         }
 
