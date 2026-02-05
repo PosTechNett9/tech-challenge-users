@@ -46,5 +46,39 @@ namespace FIAP.CloudGames.Users.API.Controllers
                 return Unauthorized(new { ex.Message });
             }
         }
+
+        [HttpPost("authenticate")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Authenticate([FromBody] AuthenticationRequestEvent request, CancellationToken cancellationToken)
+        {
+            var activity = Activity.Current;
+
+            Log.Information(
+                "Authenticattion request received | TraceId: {TraceId}",
+                activity?.TraceId.ToString()
+            );
+
+            try
+            {
+                var response = await _authService.AuthenticateAsync(request, cancellationToken);
+
+                Log.Information(
+                    "Authentication successful | TraceId: {TraceId}",
+                    activity?.TraceId.ToString()
+                );
+
+                return Ok(response);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                Log.Warning(
+                    ex,
+                    "Unauthorized Authentication attempt | TraceId: {TraceId}",
+                    activity?.TraceId.ToString()
+                );
+
+                return Unauthorized(new { ex.Message });
+            }
+        }
     }
 }

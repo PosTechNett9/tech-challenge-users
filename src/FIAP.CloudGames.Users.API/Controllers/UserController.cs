@@ -45,7 +45,7 @@ namespace FIAP.CloudGames.Users.API.Controllers
             _logger.LogInformation(
                 "GetById solicitado | UserId: {UserId} | TraceId: {TraceId}",
                 id,
-                activity.TraceId
+                activity?.TraceId.ToString() ?? Activity.Current?.TraceId.ToString()
             );
 
             var user = await _userService.GetByIdAsync(id);
@@ -55,7 +55,7 @@ namespace FIAP.CloudGames.Users.API.Controllers
                 _logger.LogWarning(
                     "User não encontrado | UserId: {UserId} | TraceId: {TraceId}",
                     id,
-                    activity.TraceId
+                    activity?.TraceId.ToString() ?? Activity.Current?.TraceId.ToString()
                 );
 
                 return NotFound();

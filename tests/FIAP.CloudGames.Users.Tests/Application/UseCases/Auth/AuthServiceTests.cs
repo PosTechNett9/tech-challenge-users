@@ -5,6 +5,7 @@ using FIAP.CloudGames.Users.Domain.Enums;
 using FIAP.CloudGames.Users.Domain.Interfaces;
 using FIAP.CloudGames.Users.Domain.Interfaces.Repositories;
 using FIAP.CloudGames.Users.Domain.ValueObjects;
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace FIAP.CloudGames.Users.Tests.Application.UseCases.Auth
@@ -13,13 +14,15 @@ namespace FIAP.CloudGames.Users.Tests.Application.UseCases.Auth
     {
         private readonly Mock<IUserRepository> _userRepositoryMock;
         private readonly Mock<IJwtTokenGenerator> _jwtTokenGeneratorMock;
+        private readonly Mock<ILogger<AuthService>> _loggerMock;
         private readonly AuthService _authService;
 
         public AuthServiceTests()
         {
             _userRepositoryMock = new Mock<IUserRepository>();
             _jwtTokenGeneratorMock = new Mock<IJwtTokenGenerator>();
-            _authService = new AuthService(_userRepositoryMock.Object, _jwtTokenGeneratorMock.Object);
+            _loggerMock = new Mock<ILogger<AuthService>>();
+            _authService = new AuthService(_userRepositoryMock.Object, _jwtTokenGeneratorMock.Object, _loggerMock.Object);
         }
 
         [Fact]
