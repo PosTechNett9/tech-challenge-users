@@ -111,3 +111,4 @@ ehthumbs.db
 *.bak
 *.tmp
 *.swp
+/k8s/base/secrets.yaml

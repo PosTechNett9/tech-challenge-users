@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-api-service
+  namespace: cloudgames
+  labels:
+    app: users-api
+  annotations:
+
+spec:
+  type: LoadBalancer
+  
+  # Seletor - encontra os pods com estas labels
+  selector:
+    app: users-api
+  
+  # Portas
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80              # Porta externa (que o cliente acessa)
+    targetPort: 8080      # Porta do container (onde a aplicação escuta)
+  
+  # Session Affinity (None = distribui, ClientIP = mesmo cliente sempre no mesmo pod)
+  sessionAffinity: None
+  
+  # External Traffic Policy
+  # Cluster = distribui entre todos os nodes
+  # Local = apenas no node onde o pod está (melhor performance, mas menos distribuição)
+  externalTrafficPolicy: Cluster
