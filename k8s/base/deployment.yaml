@@ -46,7 +46,7 @@ spec:
       containers:
       - name: users-api
         # SUBSTITUA com seu usuário do Docker Hub
-        image: https://hub.docker.com/repositories/brpeekz/tech-challenge-users-alpine:latest
+        image: brpeekz/tech-challenge-users-alpine:latest
         imagePullPolicy: Always
         
         # Porta do container

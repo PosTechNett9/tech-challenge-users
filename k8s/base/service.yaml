@@ -6,32 +6,8 @@ metadata:
   labels:
     app: users-api
   annotations:
-    # Anotações específicas para AWS Load Balancer
-    # Descomente e ajuste conforme necessário
-    
-    # Tipo de Load Balancer (nlb = Network Load Balancer, alb = Application Load Balancer)
-    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
-    
-    # Habilitar Cross-Zone Load Balancing
-    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
-    
-    # Esquema do Load Balancer (internet-facing = público, internal = interno)
-    # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
-    
-    # SSL Certificate ARN (se for usar HTTPS)
-    # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account-id:certificate/certificate-id"
-    
-    # Portas SSL
-    # service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
-    
-    # Backend Protocol
-    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
 
 spec:
-  # Tipo do Service
-  # LoadBalancer = Cria um ELB/NLB na AWS
-  # ClusterIP = Apenas acesso interno (use para dev/test)
-  # NodePort = Expõe em uma porta em cada node (raramente usado)
   type: LoadBalancer
   
   # Seletor - encontra os pods com estas labels
