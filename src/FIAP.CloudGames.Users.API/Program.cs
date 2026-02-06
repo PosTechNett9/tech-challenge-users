@@ -12,6 +12,7 @@ using FIAP.CloudGames.Users.Infrastructure.Logging;
 using FIAP.CloudGames.Users.Infrastructure.Messaging;
 using FIAP.CloudGames.Users.Infrastructure.Repositories;
 using FIAP.CloudGames.Users.Infrastructure.Seeders;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -180,6 +181,17 @@ if (app.Environment.IsDevelopment())
         c.SwaggerEndpoint("v1/swagger.json", "Users API v1");
     });
 }
+
+
+app.MapHealthChecks("/health/live", new HealthCheckOptions
+{
+    Predicate = _ => false // Apenas verifica se a aplicação está rodando
+});
+
+app.MapHealthChecks("/health/ready", new HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready") // Verifica dependências
+});
 
 app.UseHttpsRedirection();
 app.UseSerilogRequestLogging();

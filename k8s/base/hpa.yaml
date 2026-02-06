@@ -1,0 +1,65 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: users-api-hpa
+  namespace: cloudgames
+  labels:
+    app: users-api
+spec:
+  # Deployment que será escalado
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: users-api
+  
+  # Limites de réplicas
+  minReplicas: 2   # Nunca terá menos que 2 pods (alta disponibilidade)
+  maxReplicas: 10  # Nunca terá mais que 10 pods (controle de custo)
+  
+  # Métricas para escalonamento
+  metrics:
+  
+  # Métrica 1: CPU
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70  # Mantém uso médio em 70%
+  
+  # Métrica 2: Memória
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80  # Mantém uso médio em 80%
+  
+  # Comportamento de escalonamento
+  behavior:
+    
+    # Scale Up (adicionar pods)
+    scaleUp:
+      stabilizationWindowSeconds: 0  # Reage imediatamente a picos
+      policies:
+      # Política 1: Pode aumentar 100% (dobrar) a cada 30 segundos
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      # Política 2: Pode adicionar 2 pods de uma vez a cada 30 segundos
+      - type: Pods
+        value: 2
+        periodSeconds: 30
+      # Usa a política que escala MAIS (Max)
+      selectPolicy: Max
+    
+    # Scale Down (remover pods)
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Espera 5 minutos antes de remover
+      policies:
+      # Política: Remove no máximo 50% dos pods a cada 60 segundos
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      # Usa a política que escala MENOS (Min) - mais conservador
+      selectPolicy: Min

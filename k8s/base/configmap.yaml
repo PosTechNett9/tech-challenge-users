@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: users-api-config
+  namespace: cloudgames
+  labels:
+    app: users-api
+data:
+  # ASP.NET Core Environment
+  ASPNETCORE_ENVIRONMENT: "Production"
+  ASPNETCORE_URLS: "http://+:8080"
+  
+  # .NET Diagnostics
+  DOTNET_EnableDiagnostics: "0"
+  
+  # Logging Configuration
+  Logging__LogLevel__Default: "Information"
+  Logging__LogLevel__Microsoft.AspNetCore: "Warning"
+  Logging__LogLevel__Microsoft.EntityFrameworkCore: "Warning"
+  
+  # Connection String (SEM SENHA - a senha vem do Secret)
+  # Ajuste com seus dados reais do banco
+  ConnectionStrings__DefaultConnection: "Server=tech-challenge-users.cauxpuca0lvv.us-east-1.rds.amazonaws.com,1433;Database=tech-challenge-users;User Id=admin;Port=5432;"
+  
+  # Configurações adicionais da aplicação
+  # Adicione aqui outras configs que sua aplicação precise
+  Application__Name: "CloudGames Users API"
+  Application__Version: "1.0.0"

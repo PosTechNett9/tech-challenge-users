@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-api-service
+  namespace: cloudgames
+  labels:
+    app: users-api
+  annotations:
+    # Anotações específicas para AWS Load Balancer
+    # Descomente e ajuste conforme necessário
+    
+    # Tipo de Load Balancer (nlb = Network Load Balancer, alb = Application Load Balancer)
+    # service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    
+    # Habilitar Cross-Zone Load Balancing
+    # service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    
+    # Esquema do Load Balancer (internet-facing = público, internal = interno)
+    # service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    
+    # SSL Certificate ARN (se for usar HTTPS)
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account-id:certificate/certificate-id"
+    
+    # Portas SSL
+    # service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    
+    # Backend Protocol
+    # service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+
+spec:
+  # Tipo do Service
+  # LoadBalancer = Cria um ELB/NLB na AWS
+  # ClusterIP = Apenas acesso interno (use para dev/test)
+  # NodePort = Expõe em uma porta em cada node (raramente usado)
+  type: LoadBalancer
+  
+  # Seletor - encontra os pods com estas labels
+  selector:
+    app: users-api
+  
+  # Portas
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80              # Porta externa (que o cliente acessa)
+    targetPort: 8080      # Porta do container (onde a aplicação escuta)
+  
+  # Session Affinity (None = distribui, ClientIP = mesmo cliente sempre no mesmo pod)
+  sessionAffinity: None
+  
+  # External Traffic Policy
+  # Cluster = distribui entre todos os nodes
+  # Local = apenas no node onde o pod está (melhor performance, mas menos distribuição)
+  externalTrafficPolicy: Cluster
