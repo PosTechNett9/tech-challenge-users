@@ -18,8 +18,14 @@ COPY src/ ./src/
 RUN dotnet publish src/FIAP.CloudGames.Users.API/FIAP.CloudGames.Users.API.csproj \
     -c ${BUILD_CONFIGURATION} -o /app/publish --no-restore /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION} AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:${DOTNET_VERSION}-alpine AS runtime
 WORKDIR /app
+
+# ===== CORREÇÃO: Instalar ICU para suporte a culturas =====
+RUN apk add --no-cache icu-libs icu-data-full
+
+# ===== Desabilitar Globalization Invariant Mode =====
+ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=false
 
 ENV ASPNETCORE_URLS="http://+:8080" \
     ASPNETCORE_ENVIRONMENT="Production" \
