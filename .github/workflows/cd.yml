@@ -81,32 +81,66 @@ jobs:
             --region us-east-1 \
             --name cloudgames-cluster
 
-      # 5. Create Kubernetes Secrets
-      - name: Create Kubernetes secrets
+      # 5. Criar namespace se não existir
+      - name: Create namespace
         run: |
-          kubectl create namespace cloudgames --dry-run=client -o yaml | kubectl apply -f -
-          kubectl create secret generic users-api-secrets \
-            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            --from-literal=AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-            --from-literal=AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-            --from-literal=AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
-            --from-literal=AWS_REGION="us-east-1" \
-            --namespace=cloudgames \
-            --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
 
-      # 6. Deploy to Kubernetes
-      - name: Deploy to Kubernetes
+      # 6. Atualizar imagem Docker nos arquivos YAML
+      - name: Update Docker image in deployment files
         run: |
-          kubectl apply -f k8s/base/1-namespace.yaml
-          kubectl apply -f k8s/base/2-configmap.yaml
-          kubectl apply -f k8s/base/4-deployment.yaml
-          kubectl apply -f k8s/base/5-service.yaml
-          kubectl apply -f k8s/base/6-hpa.yaml
+          # Atualizar deployment.yaml
+          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/Deployment.yaml
+          
+          # Atualizar deployment-simple.yaml
+          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/Deployment_simple.yaml
+
+      # 7. Aplicar Secrets (usando os valores do GitHub Secrets)
+      - name: Apply Secrets
+        run: |
+          # Atualizar namespace nos arquivos
+          sed -i 's/namespace: default/namespace: production/g' k8s/Secrets.yaml
+          
+          # Aplicar secrets
+          kubectl apply -f k8s/Secrets.yaml
+
+      # 8. Deploy ConfigMap
+      - name: Deploy ConfigMap
+        run: |
+          # Atualizar namespace
+          sed -i 's/namespace: default/namespace: production/g' k8s/Configmap.yaml
+          
+          # Aplicar ConfigMap
+          kubectl apply -f k8s/Configmap.yaml
+
+      # 9. Deploy Application (usando deployment-simple.yaml)
+      - name: Deploy Application
+        run: |
+          # Aplicar Deployment
+          kubectl apply -f k8s/Deployment_simple.yaml
           
           echo "Aguardando rollout completar..."
-          kubectl rollout status deployment/users-api -n cloudgames --timeout=5m
+          kubectl rollout status deployment/users-service -n production --timeout=5m
 
-      # 7. Verify Deployment
+      # 10. Deploy Service
+      - name: Deploy Service
+        run: |
+          # Atualizar namespace
+          sed -i 's/namespace: default/namespace: production/g' k8s/Service.yaml
+          
+          # Aplicar Service
+          kubectl apply -f k8s/Service.yaml
+
+      # 11. Deploy HPA
+      - name: Deploy HPA
+        run: |
+          # Atualizar namespace
+          sed -i 's/namespace: default/namespace: production/g' k8s/Hpa.yaml
+          
+          # Aplicar HPA
+          kubectl apply -f k8s/Hpa.yaml
+
+      # 12. Verify Deployment
       - name: Verify deployment
         run: |
           echo "======================================"
@@ -115,21 +149,66 @@ jobs:
           echo ""
           
           echo "=== PODS ==="
-          kubectl get pods -n cloudgames -o wide
+          kubectl get pods -n production -l app=users-service -o wide
           echo ""
           
           echo "=== SERVICES ==="
-          kubectl get svc -n cloudgames
+          kubectl get svc -n production
           echo ""
           
           echo "=== HPA ==="
-          kubectl get hpa -n cloudgames
+          kubectl get hpa -n production
           echo ""
           
           echo "=== LOAD BALANCER URL ==="
-          LB_URL=$(kubectl get svc users-api-service -n cloudgames -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          echo "Aplicação disponível em: http://$LB_URL"
-          echo ""
+          echo "Aguardando provisionamento do LoadBalancer..."
+          sleep 30
           
+          LB_URL=$(kubectl get svc users-service -n production -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Ainda não disponível")
+          
+          if [ "$LB_URL" != "Ainda não disponível" ]; then
+            echo "✅ Aplicação disponível em: http://$LB_URL"
+            echo "   Health: http://$LB_URL/users/health/live"
+            echo "   Swagger: http://$LB_URL/users/swagger"
+          else
+            echo "⏳ LoadBalancer ainda sendo provisionado"
+            echo "   Execute: kubectl get svc users-service -n production"
+          fi
+          
+          echo ""
           echo "=== EVENTOS RECENTES ==="
-          kubectl get events -n cloudgames --sort-by='.lastTimestamp' | tail -10
+          kubectl get events -n production --sort-by='.lastTimestamp' | tail -10
+
+      # 13. Health Check (opcional)
+      - name: Health Check
+        continue-on-error: true
+        run: |
+          echo "Aguardando LoadBalancer..."
+          sleep 60
+          
+          LB_URL=$(kubectl get svc users-service -n production -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+          
+          if [ -n "$LB_URL" ]; then
+            echo "Testando health endpoint..."
+            
+            max_attempts=5
+            attempt=1
+            
+            while [ $attempt -le $max_attempts ]; do
+              echo "Tentativa $attempt de $max_attempts"
+              
+              if curl -f -s "http://${LB_URL}/users/health/live" > /dev/null 2>&1; then
+                echo "✅ Health check passou!"
+                exit 0
+              fi
+              
+              echo "Aguardando 10 segundos..."
+              sleep 10
+              attempt=$((attempt + 1))
+            done
+            
+            echo "⚠️ Health check não passou após $max_attempts tentativas"
+            echo "A aplicação pode ainda estar inicializando"
+          else
+            echo "⏳ LoadBalancer ainda não disponível para health check"
+          fi
