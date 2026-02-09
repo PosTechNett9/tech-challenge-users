@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: users-service-config
-  namespace: default
+  namespace: production
 data:
   # Configurações da aplicação
   ASPNETCORE_ENVIRONMENT: "Production"

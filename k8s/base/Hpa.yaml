@@ -2,7 +2,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: users-service-hpa
-  namespace: default
+  namespace: production
   labels:
     app: users-service
 spec:

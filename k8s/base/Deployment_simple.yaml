@@ -33,7 +33,7 @@ spec:
       
       containers:
       - name: users-service
-        image: YOUR_DOCKER_USERNAME/tech-challenge-users-alpine:latest
+        image: brpeekz/tech-challenge-users-alpine:latest
         imagePullPolicy: Always
         
         ports:
