@@ -89,7 +89,10 @@ jobs:
       # 6. Update Docker image
       - name: Update Docker image in deployment files
         run: |
-          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/Deployment_simple.yaml
+          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/base/Deployment_simple.yaml
+          
+          echo "Verificando substituição:"
+          grep "image:" k8s/base/Deployment_simple.yaml
 
       # 7. Create/Update Secrets from GitHub Secrets
       - name: Create Kubernetes Secrets
@@ -105,12 +108,12 @@ jobs:
       # 8. Deploy ConfigMap
       - name: Deploy ConfigMap
         run: |
-          kubectl apply -f k8s/Configmap.yaml -n production
+          kubectl apply -f k8s/base/Configmap.yaml -n production
 
       # 9. Deploy Application
       - name: Deploy Application
         run: |
-          kubectl apply -f k8s/Deployment_simple.yaml -n production
+          kubectl apply -f k8s/base/Deployment_simple.yaml -n production
           
           echo "Aguardando rollout completar..."
           kubectl rollout status deployment/users-service -n production --timeout=5m
@@ -118,12 +121,12 @@ jobs:
       # 10. Deploy Service
       - name: Deploy Service
         run: |
-          kubectl apply -f k8s/Service.yaml -n production
+          kubectl apply -f k8s/base/Service.yaml -n production
 
       # 11. Deploy HPA
       - name: Deploy HPA
         run: |
-          kubectl apply -f k8s/Hpa.yaml -n production
+          kubectl apply -f k8s/base/Hpa.yaml -n production
 
       # 12. Verify Deployment
       - name: Verify deployment
