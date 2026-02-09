@@ -15,10 +15,10 @@ data:
   AWS_REGION: "us-east-1"
   
   # SQS Configuration
-  SQS_AUTHENTICATION_REQUEST_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/YOUR_ACCOUNT_ID/authentication-request-queue"
+  SQS_AUTHENTICATION_REQUEST_QUEUE_URL: "https://sqs.us-east-1.amazonaws.com/680852412198/fcg-auth-requests-queue"
   
   # SNS Configuration
-  SNS_AUTHENTICATION_RESPONSE_TOPIC_ARN: "arn:aws:sns:us-east-1:YOUR_ACCOUNT_ID:authentication-response-topic"
+  SNS_AUTHENTICATION_RESPONSE_TOPIC_ARN: "arn:aws:sns:us-east-1:680852412198:fcg-auth-responses"
   
   # Serilog Configuration
   Serilog__MinimumLevel__Default: "Information"
