@@ -58,6 +58,17 @@ spec:
             secretKeyRef:
               name: users-service-secrets
               key: JwtSettings__Secret
+        # AWS Credentials
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: users-service-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: users-service-secrets
+              key: AWS_SECRET_ACCESS_KEY
         
         # Resource Limits and Requests (importante para HPA)
         resources:
