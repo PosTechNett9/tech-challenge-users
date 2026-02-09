@@ -7,148 +7,118 @@ metadata:
     app: users-api
     version: v1
 spec:
-  # Número inicial de réplicas (pods)
   replicas: 2
-  
-  # Seletor para identificar os pods deste deployment
+
   selector:
     matchLabels:
       app: users-api
-  
-  # Estratégia de atualização (zero downtime)
+
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1        # Pode criar 1 pod extra durante update
-      maxUnavailable: 0  # Nunca fica sem pods disponíveis
-  
-  # Template dos pods
+      maxSurge: 1
+      maxUnavailable: 0
+
   template:
     metadata:
       labels:
         app: users-api
         version: v1
       annotations:
-        prometheus.io/scrape: "false"  # Mude para true se usar Prometheus
+        prometheus.io/scrape: "false"
         prometheus.io/port: "8080"
         prometheus.io/path: "/metrics"
-    
+
     spec:
-      # Security Context do Pod
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
-      
-      # Containers
+
       containers:
-      - name: users-api
-        # SUBSTITUA com seu usuário do Docker Hub
-        image: brpeekz/tech-challenge-users-alpine:latest
-        imagePullPolicy: Always
-        
-        # Porta do container
-        ports:
-        - name: http
-          containerPort: 8080
-          protocol: TCP
-        
-        # Variáveis de ambiente do ConfigMap
-        envFrom:
-        - configMapRef:
-            name: users-api-config
-        
-        # Variáveis de ambiente dos Secrets
-        env:
-        - name: DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: users-api-secrets
-              key: DB_PASSWORD
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: users-api-secrets
-              key: JWT_SECRET
-        - name: API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: users-api-secrets
-              key: API_KEY
-        # Connection String completa com senha
-        - name: ConnectionStrings__DefaultConnection
-          valueFrom:
-            secretKeyRef:
-              name: users-api-secrets
-              key: ConnectionStrings__DefaultConnection
-        
-        # Liveness Probe - Verifica se o container está vivo
-        # Se falhar 3 vezes, Kubernetes reinicia o pod
-        livenessProbe:
-          httpGet:
-            path: /health/live
-            port: http
-            scheme: HTTP
-          initialDelaySeconds: 30  # Espera 30s após start para começar a verificar
-          periodSeconds: 10         # Verifica a cada 10s
-          timeoutSeconds: 5         # Timeout de 5s por verificação
-          successThreshold: 1       # 1 sucesso = está vivo
-          failureThreshold: 3       # 3 falhas = reinicia o pod
-        
-        # Readiness Probe - Verifica se o container está pronto para receber tráfego
-        # Se falhar, Kubernetes remove o pod do load balancer
-        readinessProbe:
-          httpGet:
-            path: /health/ready
-            port: http
-            scheme: HTTP
-          initialDelaySeconds: 10   # Espera 10s após start
-          periodSeconds: 5          # Verifica a cada 5s
-          timeoutSeconds: 3         # Timeout de 3s
-          successThreshold: 1       # 1 sucesso = está pronto
-          failureThreshold: 3       # 3 falhas = remove do load balancer
-        
-        
-        # Recursos (ESSENCIAL para HPA funcionar)
-        resources:
-          requests:
-            memory: "256Mi"  # Memória mínima garantida
-            cpu: "250m"      # 25% de 1 CPU core garantido
-          limits:
-            memory: "512Mi"  # Memória máxima permitida
-            cpu: "500m"      # 50% de 1 CPU core máximo
-        
-        # Security Context do Container
-        securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true  # Filesystem somente leitura
-          runAsNonRoot: true
-          runAsUser: 1000
-          capabilities:
-            drop:
-            - ALL  # Remove todas as capabilities Linux
-        
-        # Volume Mounts (necessário por causa do readOnlyRootFilesystem)
-        volumeMounts:
-        - name: tmp
-          mountPath: /tmp
-        - name: app-tmp
-          mountPath: /app/tmp
-      
-      # Volumes temporários
+        - name: users-api
+          image: brpeekz/tech-challenge-users-alpine:latest
+          imagePullPolicy: Always
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # Config não sensível
+          envFrom:
+            - configMapRef:
+                name: users-api-config
+
+          # Secrets (separados por responsabilidade)
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: users-api-secrets
+                  key: JWT_SECRET
+
+            # Connection string do DB fica em outro secret
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: users-db
+                  key: ConnectionStrings__DefaultConnection
+
+            # Útil para diagnosticar sem hardcode
+            - name: ASPNETCORE_URLS
+              value: http://+:8080
+
+          # Se sua API tiver endpoints de health, descomente.
+          # Caso contrário, isso vai te quebrar.
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health/live
+          #     port: http
+          #   initialDelaySeconds: 30
+          #   periodSeconds: 10
+          #   timeoutSeconds: 5
+          #   failureThreshold: 3
+          #
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health/ready
+          #     port: http
+          #   initialDelaySeconds: 10
+          #   periodSeconds: 5
+          #   timeoutSeconds: 3
+          #   failureThreshold: 3
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop: ["ALL"]
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: app-tmp
+              mountPath: /app/tmp
+
       volumes:
-      - name: tmp
-        emptyDir: {}
-      - name: app-tmp
-        emptyDir: {}
-      
-      # Restart policy
+        - name: tmp
+          emptyDir: {}
+        - name: app-tmp
+          emptyDir: {}
+
       restartPolicy: Always
-      
-      # DNS Policy
       dnsPolicy: ClusterFirst
-      
-      # Termination grace period
       terminationGracePeriodSeconds: 30
