@@ -1,0 +1,38 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service
+  namespace: default
+  labels:
+    app: users-service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"  # Network Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  type: LoadBalancer  # Ou ClusterIP se usar Ingress
+  selector:
+    app: users-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  sessionAffinity: None
+---
+# Service interno para comunicação entre microsserviços (ClusterIP)
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service-internal
+  namespace: default
+  labels:
+    app: users-service
+spec:
+  type: ClusterIP
+  selector:
+    app: users-service
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
