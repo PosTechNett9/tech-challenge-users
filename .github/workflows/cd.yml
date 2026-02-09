@@ -81,43 +81,36 @@ jobs:
             --region us-east-1 \
             --name cloudgames-cluster
 
-      # 5. Criar namespace se não existir
+      # 5. Create namespace
       - name: Create namespace
         run: |
           kubectl create namespace production --dry-run=client -o yaml | kubectl apply -f -
 
-      # 6. Atualizar imagem Docker nos arquivos YAML
+      # 6. Update Docker image
       - name: Update Docker image in deployment files
         run: |
-          # Atualizar deployment.yaml
-          sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/Deployment.yaml
-          
-          # Atualizar deployment-simple.yaml
           sed -i "s|YOUR_DOCKER_USERNAME|${{ secrets.DOCKER_USERNAME }}|g" k8s/Deployment_simple.yaml
 
-      # 7. Aplicar Secrets (usando os valores do GitHub Secrets)
-      - name: Apply Secrets
+      # 7. Create/Update Secrets from GitHub Secrets
+      - name: Create Kubernetes Secrets
         run: |
-          # Atualizar namespace nos arquivos
-          sed -i 's/namespace: default/namespace: production/g' k8s/Secrets.yaml
-          
-          # Aplicar secrets
-          kubectl apply -f k8s/Secrets.yaml
+          kubectl create secret generic users-service-secrets \
+            --from-literal=ConnectionStrings__DefaultConnection='${{ secrets.SQL_CONNECTION_STRING }}' \
+            --from-literal=JwtSettings__Secret='${{ secrets.JWT_SECRET }}' \
+            --from-literal=AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}' \
+            --from-literal=AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}' \
+            --namespace=production \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       # 8. Deploy ConfigMap
       - name: Deploy ConfigMap
         run: |
-          # Atualizar namespace
-          sed -i 's/namespace: default/namespace: production/g' k8s/Configmap.yaml
-          
-          # Aplicar ConfigMap
-          kubectl apply -f k8s/Configmap.yaml
+          kubectl apply -f k8s/Configmap.yaml -n production
 
-      # 9. Deploy Application (usando deployment-simple.yaml)
+      # 9. Deploy Application
       - name: Deploy Application
         run: |
-          # Aplicar Deployment
-          kubectl apply -f k8s/Deployment_simple.yaml
+          kubectl apply -f k8s/Deployment_simple.yaml -n production
           
           echo "Aguardando rollout completar..."
           kubectl rollout status deployment/users-service -n production --timeout=5m
@@ -125,20 +118,12 @@ jobs:
       # 10. Deploy Service
       - name: Deploy Service
         run: |
-          # Atualizar namespace
-          sed -i 's/namespace: default/namespace: production/g' k8s/Service.yaml
-          
-          # Aplicar Service
-          kubectl apply -f k8s/Service.yaml
+          kubectl apply -f k8s/Service.yaml -n production
 
       # 11. Deploy HPA
       - name: Deploy HPA
         run: |
-          # Atualizar namespace
-          sed -i 's/namespace: default/namespace: production/g' k8s/Hpa.yaml
-          
-          # Aplicar HPA
-          kubectl apply -f k8s/Hpa.yaml
+          kubectl apply -f k8s/Hpa.yaml -n production
 
       # 12. Verify Deployment
       - name: Verify deployment
@@ -179,7 +164,7 @@ jobs:
           echo "=== EVENTOS RECENTES ==="
           kubectl get events -n production --sort-by='.lastTimestamp' | tail -10
 
-      # 13. Health Check (opcional)
+      # 13. Health Check
       - name: Health Check
         continue-on-error: true
         run: |
